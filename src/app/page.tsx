@@ -197,7 +197,6 @@ export default function DashboardPage() {
     return results.filter(r => r.prediction === 'Fraudulent');
   }, [results]);
 
-
   return (
     <SidebarProvider>
       <Sidebar>
