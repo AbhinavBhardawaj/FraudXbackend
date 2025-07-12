@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const formSchema = z.object(
   Array.from({ length: 10 }, (_, i) => `V${i + 1}`).reduce((acc, key) => {
@@ -24,19 +25,53 @@ const formSchema = z.object(
   }, {} as Record<string, z.ZodNumber>)
 );
 
+type FormValues = z.infer<typeof formSchema>;
+
 type ManualInputFormProps = {
-  onSubmit: (data: z.infer<typeof formSchema>) => void;
+  onSubmit: (data: FormValues) => void;
   isLoading: boolean;
 };
 
-export function ManualInputForm({ onSubmit, isLoading }: ManualInputFormProps) {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: Array.from({ length: 10 }, (_, i) => `V${i + 1}`).reduce((acc, key) => {
+const generateDefaultValues = (): FormValues => {
+    return Array.from({ length: 10 }, (_, i) => `V${i + 1}`).reduce((acc, key) => {
       acc[key] = parseFloat((Math.random() * 20 - 10).toFixed(2));
       return acc;
-    }, {} as Record<string, number>),
+    }, {} as Record<string, number>) as FormValues;
+}
+
+export function ManualInputForm({ onSubmit, isLoading }: ManualInputFormProps) {
+  const [isClient, setIsClient] = React.useState(false);
+  
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    // Set empty values initially, will be populated on client
+    defaultValues: Array.from({ length: 10 }, (_, i) => `V${i + 1}`).reduce((acc, key) => {
+        acc[key] = 0;
+        return acc;
+      }, {} as Record<string, number>) as FormValues,
   });
+
+  React.useEffect(() => {
+    // This effect runs only on the client
+    form.reset(generateDefaultValues());
+    setIsClient(true);
+  }, [form]);
+
+  if (!isClient) {
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+            {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-8 w-full" />
+                </div>
+            ))}
+            </div>
+            <Skeleton className="h-10 w-full" />
+        </div>
+    );
+  }
 
   return (
     <Form {...form}>

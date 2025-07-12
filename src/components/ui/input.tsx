@@ -13,6 +13,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         {...props}
+        // Workaround for react-hook-form value conversion
+        value={props.value ?? ""}
       />
     )
   }
