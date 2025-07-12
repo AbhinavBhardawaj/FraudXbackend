@@ -32,7 +32,6 @@ import { RiskScoreCard } from '@/components/risk-score-card';
 import { UserInformationCard } from '@/components/user-information-card';
 import { FraudRulesCard } from '@/components/fraud-rules-card';
 
-
 const initialPatterns: TransactionPattern[] = [
     { date: "2024-03-01", total: 20, fraudulent: 5 },
     { date: "2024-03-02", total: 30, fraudulent: 8 },
@@ -41,8 +40,8 @@ const initialPatterns: TransactionPattern[] = [
     { date: "2024-03-05", total: 25, fraudulent: 4 },
 ];
 
-
 export default function DashboardPage() {
+  const [isClient, setIsClient] = React.useState(false);
   const [results, setResults] = React.useState<PredictionResult[]>([]);
   const [patterns, setPatterns] = React.useState<TransactionPattern[]>(initialPatterns);
   const [featureImportance, setFeatureImportance] = React.useState<FeatureImportance[]>([]);
@@ -53,6 +52,11 @@ export default function DashboardPage() {
   const [isAiReplying, setIsAiReplying] = React.useState(false);
   const [riskScore, setRiskScore] = React.useState<number | null>(null);
   const { toast } = useToast();
+
+  // Ensure client-side rendering for hydration safety
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const fetchSummary = async (predictionResults: PredictionResult[]) => {
     if (predictionResults.length === 0) {
@@ -109,7 +113,7 @@ export default function DashboardPage() {
       }
 
       const newPatterns = currentResults.reduce((acc, curr) => {
-        const date = new Date(Date.now()).toISOString().split('T')[0];
+        const date = new Date().toISOString().split('T')[0]; // Use consistent date generation
         let entry = acc.find(p => p.date === date);
         if (!entry) {
             entry = { date, total: 0, fraudulent: 0 };
@@ -162,7 +166,11 @@ export default function DashboardPage() {
   };
 
   const handleAiSubmit = async (question: string) => {
-    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: question };
+    const userMessage: Message = { 
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
+      role: 'user', 
+      content: question 
+    };
     setMessages(prev => [...prev, userMessage]);
     setIsAiReplying(true);
 
@@ -171,11 +179,15 @@ export default function DashboardPage() {
         if (response.error) {
             throw new Error(response.error);
         }
-        const aiMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: response.answer || ''};
+        const aiMessage: Message = { 
+          id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
+          role: 'assistant', 
+          content: response.answer || ''
+        };
         setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
         const errorMessage: Message = { 
-            id: (Date.now() + 1).toString(), 
+            id: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
             role: 'assistant', 
             content: error instanceof Error ? error.message : 'An unexpected error occurred.'
         };
@@ -193,6 +205,18 @@ export default function DashboardPage() {
   const flaggedTransactions = React.useMemo(() => {
     return results.filter(r => r.prediction === 'Fraudulent');
   }, [results]);
+
+  // Show loading state during hydration
+  if (!isClient) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>
