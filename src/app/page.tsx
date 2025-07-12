@@ -109,9 +109,8 @@ export default function DashboardPage() {
         setRiskScore(null);
       }
 
-      // Process patterns for the chart
       const newPatterns = currentResults.reduce((acc, curr) => {
-        const date = new Date(Date.now()).toISOString().split('T')[0]; // Using current date as mock
+        const date = new Date(Date.now()).toISOString().split('T')[0];
         let entry = acc.find(p => p.date === date);
         if (!entry) {
             entry = { date, total: 0, fraudulent: 0 };
@@ -135,7 +134,6 @@ export default function DashboardPage() {
         description: `${newResults.length} transaction(s) processed.`,
       });
 
-      // Fetch summary after getting results
       fetchSummary(currentResults);
 
     } catch (error) {
@@ -238,7 +236,6 @@ export default function DashboardPage() {
             <FraudRulesCard />
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
-            
             <div className="lg:col-span-3">
               <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
             </div>
