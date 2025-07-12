@@ -82,11 +82,16 @@ export default function DashboardPage() {
   
   const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>, isBatch: boolean) => {
     setIsLoading(true);
-    setResults([]);
-    setMessages([]);
-    setSummary('');
-    setFeatureImportance([]);
-    setRiskScore(null);
+    
+    // For batch predictions, we clear everything first.
+    // For single, we only update the risk score and add to the list.
+    if (isBatch) {
+        setResults([]);
+        setMessages([]);
+        setSummary('');
+        setFeatureImportance([]);
+        setRiskScore(null);
+    }
 
 
     try {
@@ -96,15 +101,24 @@ export default function DashboardPage() {
       }
       
       const newResults = response.results || (response.result ? [response.result] : []);
-      setResults(newResults);
+      
+      if (isBatch) {
+        setResults(newResults);
+      } else if (response.result) {
+        setResults(prevResults => [response.result!, ...prevResults]);
+      }
+      
       setFeatureImportance(response.featureImportance || []);
       
       if (!isBatch && response.result) {
         setRiskScore(response.result.riskScore);
+      } else {
+        setRiskScore(null);
       }
 
       // Process patterns for the chart
-      const newPatterns = newResults.reduce((acc, curr) => {
+      const currentResults = isBatch ? newResults : [response.result!, ...results];
+      const newPatterns = currentResults.reduce((acc, curr) => {
         const date = new Date(Date.now()).toISOString().split('T')[0]; // Using current date as mock
         let entry = acc.find(p => p.date === date);
         if (!entry) {
@@ -130,7 +144,7 @@ export default function DashboardPage() {
       });
 
       // Fetch summary after getting results
-      fetchSummary(newResults);
+      fetchSummary(currentResults);
 
     } catch (error) {
       toast({
@@ -138,11 +152,13 @@ export default function DashboardPage() {
         title: 'Prediction Failed',
         description: error instanceof Error ? error.message : 'An unknown error occurred.',
       });
-      setResults([]);
-      setPatterns(initialPatterns);
-      setFeatureImportance([]);
-      setSummary('');
-      setRiskScore(null);
+      if(isBatch) {
+        setResults([]);
+        setPatterns(initialPatterns);
+        setFeatureImportance([]);
+        setSummary('');
+        setRiskScore(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -232,10 +248,9 @@ export default function DashboardPage() {
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
             
-            {/* The summary card can span two columns if desired */}
-            {/* <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} className="lg:col-span-2" /> */}
+            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} className="lg:col-span-2" />
           </div>
-          {isLoading ? (
+          {isLoading && results.length === 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>Flagged Transactions</CardTitle>
