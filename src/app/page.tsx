@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from 'react';
@@ -18,45 +19,35 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { ManualInputForm } from '@/components/manual-input-form';
 import { CsvUpload } from '@/components/csv-upload';
 import { DashboardHeader } from '@/components/dashboard-header';
-import { FeatureImportanceChart } from '@/components/feature-importance-chart';
 import { ResultsTable } from '@/components/results-table';
-import type { PredictionResult, FeatureImportance, Transaction, Message } from '@/lib/definitions';
+import type { PredictionResult, Transaction, Message, TransactionPattern } from '@/lib/definitions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { predictFraud, batchPredictFraud, getSummary, getAnswer } from '@/app/actions';
-import { SummaryCard } from '@/components/summary-card';
+import { predictFraud, batchPredictFraud, getAnswer } from '@/app/actions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AskAi } from '@/components/ask-ai';
+import { FraudProbabilityChart } from '@/components/fraud-probability-chart';
+import { TransactionPatternsChart } from '@/components/transaction-patterns-chart';
 
-const initialFeatureImportance: FeatureImportance[] = [
-  { feature: 'V17', importance: 0.18 },
-  { feature: 'V14', importance: 0.15 },
-  { feature: 'V12', importance: 0.12 },
-  { feature: 'V10', importance: 0.10 },
-  { feature: 'V11', importance: 0.09 },
-  { feature: 'V16', importance: 0.08 },
-  { feature: 'V7', importance: 0.07 },
-  { feature: 'V4', importance: 0.06 },
-  { feature: 'V3', importance: 0.05 },
-  { feature: 'V9', importance: 0.04 },
+const initialPatterns: TransactionPattern[] = [
+    { date: "2024-03-01", total: 20, fraudulent: 5 },
+    { date: "2024-03-02", total: 30, fraudulent: 8 },
+    { date: "2024-03-03", total: 45, fraudulent: 15 },
+    { date: "2024-03-04", total: 35, fraudulent: 12 },
+    { date: "2024-03-05", total: 25, fraudulent: 4 },
 ];
 
-const initialSummary = "No transactions have been processed yet. Submit a single transaction or a batch file to get started.";
 
 export default function DashboardPage() {
   const [results, setResults] = React.useState<PredictionResult[]>([]);
-  const [featureImportance, setFeatureImportance] = React.useState<FeatureImportance[]>(initialFeatureImportance);
-  const [summary, setSummary] = React.useState<string>(initialSummary);
+  const [patterns, setPatterns] = React.useState<TransactionPattern[]>(initialPatterns);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [isSummaryLoading, setIsSummaryLoading] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [isAiReplying, setIsAiReplying] = React.useState(false);
   const { toast } = useToast();
   
-  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>) => {
+  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, error?: string }>) => {
     setIsLoading(true);
-    setIsSummaryLoading(true);
     setResults([]);
-    setSummary('');
     setMessages([]);
 
     try {
@@ -68,31 +59,31 @@ export default function DashboardPage() {
       const newResults = response.results || (response.result ? [response.result] : []);
       setResults(newResults);
 
-      if (response.featureImportance) {
-        setFeatureImportance(response.featureImportance);
+      // Process patterns for the chart
+      const newPatterns = newResults.reduce((acc, curr) => {
+        const date = new Date(Date.now()).toISOString().split('T')[0]; // Using current date as mock
+        let entry = acc.find(p => p.date === date);
+        if (!entry) {
+            entry = { date, total: 0, fraudulent: 0 };
+            acc.push(entry);
+        }
+        entry.total += 1;
+        if (curr.prediction === 'Fraudulent') {
+            entry.fraudulent += 1;
+        }
+        return acc;
+      }, [] as TransactionPattern[]);
+
+      if(newPatterns.length > 0) {
+        setPatterns(newPatterns);
+      } else {
+        setPatterns(initialPatterns);
       }
       
       toast({
         title: 'Prediction Successful',
         description: `${newResults.length} transaction(s) processed.`,
       });
-      
-      // Generate summary
-      if (newResults.length > 0) {
-        const summaryResponse = await getSummary(newResults);
-        if(summaryResponse.summary) {
-          setSummary(summaryResponse.summary);
-        } else {
-          setSummary('Could not generate a summary for the results.');
-           toast({
-            variant: 'destructive',
-            title: 'Summary Failed',
-            description: summaryResponse.error,
-          });
-        }
-      } else {
-        setSummary(initialSummary);
-      }
 
     } catch (error) {
       toast({
@@ -101,18 +92,19 @@ export default function DashboardPage() {
         description: error instanceof Error ? error.message : 'An unknown error occurred.',
       });
       setResults([]);
-      setSummary(initialSummary);
+      setPatterns(initialPatterns);
     } finally {
       setIsLoading(false);
-      setIsSummaryLoading(false);
     }
   };
 
   const handleManualSubmit = (data: Transaction) => {
+    // In a real scenario, you'd get feature importance from the model
     processPredictions(predictFraud(data));
   };
   
   const handleCsvSubmit = (file: File) => {
+    // In a real scenario, you'd get feature importance from the model
     processPredictions(batchPredictFraud(file.name));
   };
 
@@ -145,37 +137,9 @@ export default function DashboardPage() {
     }
   };
   
-  const downloadCsv = () => {
-    if (results.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Data',
-        description: 'There is no data to download.',
-      });
-      return;
-    }
-  
-    const headers = Object.keys(results[0]).filter(h => h !== 'id');
-    const csvContent = [
-      headers.join(','),
-      ...results.map(row => headers.map(header => {
-        const cell = row[header as keyof PredictionResult];
-        const value = typeof cell === 'number' ? cell.toFixed(4) : `"${String(cell).replace(/"/g, '""')}"`;
-        return value;
-      }).join(','))
-    ].join('\n');
-  
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'prediction_results.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  const flaggedTransactions = React.useMemo(() => {
+    return results.filter(r => r.prediction === 'Fraudulent');
+  }, [results]);
 
 
   return (
@@ -210,29 +174,30 @@ export default function DashboardPage() {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset className="flex flex-col">
-        <DashboardHeader onDownload={downloadCsv} canDownload={results.length > 0} />
+        <DashboardHeader />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-8">
           <div className="grid gap-8 md:grid-cols-2">
-            <SummaryCard summary={summary} isLoading={isSummaryLoading} />
-            <FeatureImportanceChart data={featureImportance} />
+            <FraudProbabilityChart data={results} isLoading={isLoading} />
+            <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
           </div>
           {isLoading ? (
             <Card>
               <CardHeader>
-                <CardTitle>Prediction Results</CardTitle>
+                <CardTitle>Flagged Transactions</CardTitle>
                 <CardDescription>Processing data...</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <Skeleton className="h-[400px] w-full" />
+                  <Skeleton className="h-[250px] w-full" />
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <ResultsTable data={results} />
+            <ResultsTable data={flaggedTransactions} />
           )}
         </main>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+

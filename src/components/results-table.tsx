@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -15,7 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import type { PredictionResult } from '@/lib/definitions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -24,53 +24,39 @@ type ResultsTableProps = {
 };
 
 export function ResultsTable({ data }: ResultsTableProps) {
-  const getBadgeVariant = (prediction: 'Fraudulent' | 'Not Fraudulent') => {
-    return prediction === 'Fraudulent' ? 'destructive' : 'secondary';
-  };
-  
-  const getRiskColor = (score: number) => {
-    if (score > 0.8) return 'text-destructive';
-    if (score > 0.5) return 'text-amber-600 dark:text-amber-500';
-    return 'text-green-600 dark:text-green-500';
-  }
-
-  const columns = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10'];
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Prediction Results</CardTitle>
+        <CardTitle>Flagged Transactions</CardTitle>
         <CardDescription>
-          {data.length > 0 ? `Showing ${data.length} results.` : 'No results to display. Run a prediction to get started.'}
+          {data.length > 0 ? `Showing ${data.length} transactions flagged as high-risk.` : 'No fraudulent transactions detected in the latest run.'}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] w-full rounded-md border">
+        <ScrollArea className="h-[250px] w-full rounded-md border">
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm">
               <TableRow>
-                {columns.map(col => <TableHead key={col}>{col}</TableHead>)}
-                <TableHead className="text-right">Risk Score</TableHead>
-                <TableHead>Prediction</TableHead>
+                <TableHead>Transaction ID</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Fraud Probability</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.length > 0 ? (
                 data.map((row) => (
                   <TableRow key={row.id}>
-                    {columns.map(col => <TableCell key={col}>{(row[col] as number)?.toFixed(4)}</TableCell>)}
-                    <TableCell className={`text-right font-mono font-medium ${getRiskColor(row.riskScore)}`}>
+                    <TableCell className="font-mono">{row.id}</TableCell>
+                    <TableCell>{new Date().toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right font-medium text-destructive">
                       {(row.riskScore * 100).toFixed(1)}%
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getBadgeVariant(row.prediction)} className="w-[110px] justify-center">{row.prediction}</Badge>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={columns.length + 2} className="h-24 text-center text-muted-foreground">
-                    Your prediction results will appear here.
+                  <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                    Your flagged transactions will appear here.
                   </TableCell>
                 </TableRow>
               )}

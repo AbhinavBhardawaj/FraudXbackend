@@ -1,3 +1,4 @@
+
 export type Transaction = {
   [key: string]: number | string;
 };
@@ -17,4 +18,10 @@ export type Message = {
     id: string;
     role: 'user' | 'assistant';
     content: string;
+};
+
+export type TransactionPattern = {
+  date: string;
+  total: number;
+  fraudulent: number;
 };
