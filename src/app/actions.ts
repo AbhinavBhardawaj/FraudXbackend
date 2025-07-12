@@ -2,6 +2,7 @@
 
 import type { PredictionResult, FeatureImportance, Transaction } from "@/lib/definitions";
 import { summarizeResults, type SummarizeResultsInput } from "@/ai/flows/summarize-results-flow";
+import { askOnData, type AskOnDataInput } from "@/ai/flows/ask-on-data-flow";
 
 const MOCK_FEATURE_IMPORTANCE: FeatureImportance[] = [
   { feature: 'V17', importance: 0.18 },
@@ -89,4 +90,21 @@ export async function getSummary(results: PredictionResult[]): Promise<{summary?
     console.error(e);
     return { error: 'Failed to generate summary.'}
   }
+}
+
+export async function getAnswer(question: string, results: PredictionResult[]): Promise<{answer?: string; error?: string}> {
+    if (results.length === 0) {
+        return { answer: "I can't answer questions until some transaction data is available. Please run a prediction first." };
+    }
+    if (!question) {
+        return { error: "Please provide a question." };
+    }
+    try {
+        const input: AskOnDataInput = { question, results };
+        const { answer } = await askOnData(input);
+        return { answer };
+    } catch (e) {
+        console.error(e);
+        return { error: 'Failed to get an answer from the AI.' };
+    }
 }

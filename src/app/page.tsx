@@ -20,11 +20,12 @@ import { CsvUpload } from '@/components/csv-upload';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { FeatureImportanceChart } from '@/components/feature-importance-chart';
 import { ResultsTable } from '@/components/results-table';
-import type { PredictionResult, FeatureImportance, Transaction } from '@/lib/definitions';
+import type { PredictionResult, FeatureImportance, Transaction, Message } from '@/lib/definitions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { predictFraud, batchPredictFraud, getSummary } from '@/app/actions';
+import { predictFraud, batchPredictFraud, getSummary, getAnswer } from '@/app/actions';
 import { SummaryCard } from '@/components/summary-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AskAi } from '@/components/ask-ai';
 
 const initialFeatureImportance: FeatureImportance[] = [
   { feature: 'V17', importance: 0.18 },
@@ -47,6 +48,8 @@ export default function DashboardPage() {
   const [summary, setSummary] = React.useState<string>(initialSummary);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSummaryLoading, setIsSummaryLoading] = React.useState(false);
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [isAiReplying, setIsAiReplying] = React.useState(false);
   const { toast } = useToast();
   
   const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>) => {
@@ -54,6 +57,7 @@ export default function DashboardPage() {
     setIsSummaryLoading(true);
     setResults([]);
     setSummary('');
+    setMessages([]);
 
     try {
       const response = await predictionPromise;
@@ -111,6 +115,35 @@ export default function DashboardPage() {
   const handleCsvSubmit = (file: File) => {
     processPredictions(batchPredictFraud(file.name));
   };
+
+  const handleAiSubmit = async (question: string) => {
+    const userMessage: Message = { id: Date.now().toString(), role: 'user', content: question };
+    setMessages(prev => [...prev, userMessage]);
+    setIsAiReplying(true);
+
+    try {
+        const response = await getAnswer(question, results);
+        if (response.error) {
+            throw new Error(response.error);
+        }
+        const aiMessage: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: response.answer || ''};
+        setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+        const errorMessage: Message = { 
+            id: (Date.now() + 1).toString(), 
+            role: 'assistant', 
+            content: error instanceof Error ? error.message : 'An unexpected error occurred.'
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        toast({
+            variant: 'destructive',
+            title: 'AI Reply Failed',
+            description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        });
+    } finally {
+        setIsAiReplying(false);
+    }
+  };
   
   const downloadCsv = () => {
     if (results.length === 0) {
@@ -160,6 +193,16 @@ export default function DashboardPage() {
             <SidebarGroup>
                <SidebarGroupLabel>Batch Upload</SidebarGroupLabel>
                <CsvUpload onSubmit={handleCsvSubmit} isLoading={isLoading} />
+            </SidebarGroup>
+            <SidebarSeparator />
+            <SidebarGroup>
+                <SidebarGroupLabel>Ask AI</SidebarGroupLabel>
+                <AskAi 
+                    messages={messages} 
+                    onSubmit={handleAiSubmit} 
+                    isReplying={isAiReplying}
+                    isDataAvailable={results.length > 0}
+                />
             </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
