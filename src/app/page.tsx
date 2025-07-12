@@ -29,6 +29,9 @@ import { FraudProbabilityChart } from '@/components/fraud-probability-chart';
 import { TransactionPatternsChart } from '@/components/transaction-patterns-chart';
 import { SummaryCard } from '@/components/summary-card';
 import { FeatureImportanceChart } from '@/components/feature-importance-chart';
+import { RiskScoreCard } from '@/components/risk-score-card';
+import { UserInformationCard } from '@/components/user-information-card';
+import { FraudRulesCard } from '@/components/fraud-rules-card';
 
 
 const initialPatterns: TransactionPattern[] = [
@@ -49,6 +52,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [isAiReplying, setIsAiReplying] = React.useState(false);
+  const [riskScore, setRiskScore] = React.useState<number | null>(null);
   const { toast } = useToast();
 
   const fetchSummary = async (predictionResults: PredictionResult[]) => {
@@ -76,12 +80,13 @@ export default function DashboardPage() {
     }
   };
   
-  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>) => {
+  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>, isBatch: boolean) => {
     setIsLoading(true);
     setResults([]);
     setMessages([]);
     setSummary('');
     setFeatureImportance([]);
+    setRiskScore(null);
 
 
     try {
@@ -93,6 +98,10 @@ export default function DashboardPage() {
       const newResults = response.results || (response.result ? [response.result] : []);
       setResults(newResults);
       setFeatureImportance(response.featureImportance || []);
+      
+      if (!isBatch && response.result) {
+        setRiskScore(response.result.riskScore);
+      }
 
       // Process patterns for the chart
       const newPatterns = newResults.reduce((acc, curr) => {
@@ -133,17 +142,18 @@ export default function DashboardPage() {
       setPatterns(initialPatterns);
       setFeatureImportance([]);
       setSummary('');
+      setRiskScore(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleManualSubmit = (data: Transaction) => {
-    processPredictions(predictFraud(data));
+    processPredictions(predictFraud(data), false);
   };
   
   const handleCsvSubmit = (file: File) => {
-    processPredictions(batchPredictFraud(file.name));
+    processPredictions(batchPredictFraud(file.name), true);
   };
 
   const handleAiSubmit = async (question: string) => {
@@ -214,11 +224,16 @@ export default function DashboardPage() {
       <SidebarInset className="flex flex-col">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-8">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-2">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <FeatureImportanceChart data={featureImportance} />
+            <UserInformationCard />
+            <RiskScoreCard score={riskScore} isLoading={isLoading} />
+            <FraudRulesCard />
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
-            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
-            <FeatureImportanceChart data={featureImportance} />
+            
+            {/* The summary card can span two columns if desired */}
+            {/* <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} className="lg:col-span-2" /> */}
           </div>
           {isLoading ? (
             <Card>
@@ -240,4 +255,3 @@ export default function DashboardPage() {
     </SidebarProvider>
   );
 }
-
