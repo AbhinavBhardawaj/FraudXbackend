@@ -1,6 +1,7 @@
 "use server";
 
 import type { PredictionResult, FeatureImportance, Transaction } from "@/lib/definitions";
+import { summarizeResults, type SummarizeResultsInput } from "@/ai/flows/summarize-results-flow";
 
 const MOCK_FEATURE_IMPORTANCE: FeatureImportance[] = [
   { feature: 'V17', importance: 0.18 },
@@ -76,5 +77,16 @@ export async function batchPredictFraud(fileName: string): Promise<{ results?: P
     return { results, featureImportance: MOCK_FEATURE_IMPORTANCE };
   } catch (e) {
     return { error: "An unexpected error occurred during batch processing." };
+  }
+}
+
+export async function getSummary(results: PredictionResult[]): Promise<{summary?: string; error?: string}> {
+  try {
+    const input: SummarizeResultsInput = { results: results.map(r => ({...r})) };
+    const { summary } = await summarizeResults(input);
+    return { summary };
+  } catch (e) {
+    console.error(e);
+    return { error: 'Failed to generate summary.'}
   }
 }

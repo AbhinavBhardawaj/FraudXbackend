@@ -22,7 +22,9 @@ import { FeatureImportanceChart } from '@/components/feature-importance-chart';
 import { ResultsTable } from '@/components/results-table';
 import type { PredictionResult, FeatureImportance, Transaction } from '@/lib/definitions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { predictFraud, batchPredictFraud } from '@/app/actions';
+import { predictFraud, batchPredictFraud, getSummary } from '@/app/actions';
+import { SummaryCard } from '@/components/summary-card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const initialFeatureImportance: FeatureImportance[] = [
   { feature: 'V17', importance: 0.18 },
@@ -37,28 +39,57 @@ const initialFeatureImportance: FeatureImportance[] = [
   { feature: 'V9', importance: 0.04 },
 ];
 
+const initialSummary = "No transactions have been processed yet. Submit a single transaction or a batch file to get started.";
+
 export default function DashboardPage() {
   const [results, setResults] = React.useState<PredictionResult[]>([]);
   const [featureImportance, setFeatureImportance] = React.useState<FeatureImportance[]>(initialFeatureImportance);
+  const [summary, setSummary] = React.useState<string>(initialSummary);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isSummaryLoading, setIsSummaryLoading] = React.useState(false);
   const { toast } = useToast();
-
-  const handleManualSubmit = async (data: Transaction) => {
+  
+  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>) => {
     setIsLoading(true);
+    setIsSummaryLoading(true);
     setResults([]);
+    setSummary('');
+
     try {
-      const response = await predictFraud(data);
+      const response = await predictionPromise;
       if (response.error) {
         throw new Error(response.error);
       }
-      setResults(response.result ? [response.result] : []);
-      if(response.featureImportance) {
+      
+      const newResults = response.results || (response.result ? [response.result] : []);
+      setResults(newResults);
+
+      if (response.featureImportance) {
         setFeatureImportance(response.featureImportance);
       }
-       toast({
+      
+      toast({
         title: 'Prediction Successful',
-        description: 'Single transaction processed.',
+        description: `${newResults.length} transaction(s) processed.`,
       });
+      
+      // Generate summary
+      if (newResults.length > 0) {
+        const summaryResponse = await getSummary(newResults);
+        if(summaryResponse.summary) {
+          setSummary(summaryResponse.summary);
+        } else {
+          setSummary('Could not generate a summary for the results.');
+           toast({
+            variant: 'destructive',
+            title: 'Summary Failed',
+            description: summaryResponse.error,
+          });
+        }
+      } else {
+        setSummary(initialSummary);
+      }
+
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -66,37 +97,19 @@ export default function DashboardPage() {
         description: error instanceof Error ? error.message : 'An unknown error occurred.',
       });
       setResults([]);
+      setSummary(initialSummary);
     } finally {
       setIsLoading(false);
+      setIsSummaryLoading(false);
     }
   };
+
+  const handleManualSubmit = (data: Transaction) => {
+    processPredictions(predictFraud(data));
+  };
   
-  const handleCsvSubmit = async (file: File) => {
-    setIsLoading(true);
-    setResults([]);
-    try {
-      const response = await batchPredictFraud(file.name); // Simulating with file name
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      setResults(response.results || []);
-      if(response.featureImportance) {
-        setFeatureImportance(response.featureImportance);
-      }
-      toast({
-        title: 'Batch Prediction Successful',
-        description: `${response.results?.length || 0} transactions processed.`,
-      });
-    } catch (error) {
-       toast({
-        variant: 'destructive',
-        title: 'Batch Prediction Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred.',
-      });
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
+  const handleCsvSubmit = (file: File) => {
+    processPredictions(batchPredictFraud(file.name));
   };
   
   const downloadCsv = () => {
@@ -156,14 +169,10 @@ export default function DashboardPage() {
       <SidebarInset className="flex flex-col">
         <DashboardHeader onDownload={downloadCsv} canDownload={results.length > 0} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-8">
-            {/* 
-              Future Enhancements:
-              - Real-time prediction stream using WebSockets.
-              - Interactive SHAP plots for model explainability.
-              - Historical prediction data view with filtering and search.
-              - User authentication and role-based access control.
-            */}
-          <FeatureImportanceChart data={featureImportance} />
+          <div className="grid gap-8 md:grid-cols-2">
+            <SummaryCard summary={summary} isLoading={isSummaryLoading} />
+            <FeatureImportanceChart data={featureImportance} />
+          </div>
           {isLoading ? (
             <Card>
               <CardHeader>

@@ -35,7 +35,7 @@ export function FeatureImportanceChart({ data }: FeatureImportanceChartProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[350px] w-full">
+        <ChartContainer config={chartConfig} className="h-[250px] w-full">
           <BarChart
             data={data}
             layout="vertical"
