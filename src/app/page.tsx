@@ -83,8 +83,8 @@ export default function DashboardPage() {
   const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>, isBatch: boolean) => {
     setIsLoading(true);
     
-    // For batch predictions, we clear everything first.
-    // For single, we only update the risk score and add to the list.
+    // For single predictions, we only update the risk score.
+    // For batch predictions, we clear previous results.
     if (isBatch) {
         setResults([]);
         setMessages([]);
@@ -93,7 +93,6 @@ export default function DashboardPage() {
         setRiskScore(null);
     }
 
-
     try {
       const response = await predictionPromise;
       if (response.error) {
@@ -101,13 +100,9 @@ export default function DashboardPage() {
       }
       
       const newResults = response.results || (response.result ? [response.result] : []);
+      const currentResults = isBatch ? newResults : [response.result!, ...results];
       
-      if (isBatch) {
-        setResults(newResults);
-      } else if (response.result) {
-        setResults(prevResults => [response.result!, ...prevResults]);
-      }
-      
+      setResults(currentResults);
       setFeatureImportance(response.featureImportance || []);
       
       if (!isBatch && response.result) {
@@ -117,7 +112,6 @@ export default function DashboardPage() {
       }
 
       // Process patterns for the chart
-      const currentResults = isBatch ? newResults : [response.result!, ...results];
       const newPatterns = currentResults.reduce((acc, curr) => {
         const date = new Date(Date.now()).toISOString().split('T')[0]; // Using current date as mock
         let entry = acc.find(p => p.date === date);
@@ -248,7 +242,10 @@ export default function DashboardPage() {
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
             
-            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} className="lg:col-span-2" />
+            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
+            <div className="lg:col-span-2">
+              <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
+            </div>
           </div>
           {isLoading && results.length === 0 ? (
             <Card>
