@@ -29,8 +29,20 @@ export function RiskScoreCard({ score, isLoading }: RiskScoreCardProps) {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="space-y-6 flex flex-col items-center">
-            <Skeleton className="h-4 w-full" />
+          <div className="space-y-6 flex flex-col items-center pt-2">
+            <div className="w-full">
+              <Slider
+                value={[0]}
+                max={100}
+                step={1}
+                disabled
+                className="[&>span:first-child]:bg-transparent"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                <span>Low</span>
+                <span>High</span>
+              </div>
+            </div>
             <Skeleton className="h-10 w-20" />
           </div>
         ) : (

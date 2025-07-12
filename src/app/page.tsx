@@ -83,8 +83,6 @@ export default function DashboardPage() {
   const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>, isBatch: boolean) => {
     setIsLoading(true);
     
-    // For single predictions, we only update the risk score.
-    // For batch predictions, we clear previous results.
     if (isBatch) {
         setResults([]);
         setMessages([]);
@@ -100,14 +98,14 @@ export default function DashboardPage() {
       }
       
       const newResults = response.results || (response.result ? [response.result] : []);
-      const currentResults = isBatch ? newResults : [response.result!, ...results];
+      const currentResults = isBatch ? newResults : (response.result ? [response.result, ...results] : results);
       
       setResults(currentResults);
       setFeatureImportance(response.featureImportance || []);
       
       if (!isBatch && response.result) {
         setRiskScore(response.result.riskScore);
-      } else {
+      } else if (isBatch) {
         setRiskScore(null);
       }
 
@@ -237,13 +235,12 @@ export default function DashboardPage() {
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             <FeatureImportanceChart data={featureImportance} />
             <UserInformationCard />
-            <RiskScoreCard score={riskScore} isLoading={isLoading} />
+            <RiskScoreCard score={riskScore} isLoading={isLoading && riskScore === null} />
             <FraudRulesCard />
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
             
-            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
               <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
             </div>
           </div>
@@ -252,7 +249,7 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Flagged Transactions</CardTitle>
                 <CardDescription>Processing data...</CardDescription>
-              </CardHeader>
+              </Header>
               <CardContent>
                 <div className="space-y-4">
                   <Skeleton className="h-[250px] w-full" />
