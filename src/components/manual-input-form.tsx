@@ -52,7 +52,7 @@ export function ManualInputForm({ onSubmit, isLoading }: ManualInputFormProps) {
   });
 
   React.useEffect(() => {
-    // This effect runs only on the client, after hydration
+    // This effect runs only on the client, after hydration, to prevent mismatch
     form.reset(generateDefaultValues());
     setIsClient(true);
   }, [form]);
