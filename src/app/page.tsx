@@ -20,13 +20,16 @@ import { ManualInputForm } from '@/components/manual-input-form';
 import { CsvUpload } from '@/components/csv-upload';
 import { DashboardHeader } from '@/components/dashboard-header';
 import { ResultsTable } from '@/components/results-table';
-import type { PredictionResult, Transaction, Message, TransactionPattern } from '@/lib/definitions';
+import type { PredictionResult, Transaction, Message, TransactionPattern, FeatureImportance } from '@/lib/definitions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { predictFraud, batchPredictFraud, getAnswer } from '@/app/actions';
+import { predictFraud, batchPredictFraud, getAnswer, getSummary } from '@/app/actions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AskAi } from '@/components/ask-ai';
 import { FraudProbabilityChart } from '@/components/fraud-probability-chart';
 import { TransactionPatternsChart } from '@/components/transaction-patterns-chart';
+import { SummaryCard } from '@/components/summary-card';
+import { FeatureImportanceChart } from '@/components/feature-importance-chart';
+
 
 const initialPatterns: TransactionPattern[] = [
     { date: "2024-03-01", total: 20, fraudulent: 5 },
@@ -40,15 +43,46 @@ const initialPatterns: TransactionPattern[] = [
 export default function DashboardPage() {
   const [results, setResults] = React.useState<PredictionResult[]>([]);
   const [patterns, setPatterns] = React.useState<TransactionPattern[]>(initialPatterns);
+  const [featureImportance, setFeatureImportance] = React.useState<FeatureImportance[]>([]);
+  const [summary, setSummary] = React.useState('');
+  const [isSummaryLoading, setIsSummaryLoading] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [isAiReplying, setIsAiReplying] = React.useState(false);
   const { toast } = useToast();
+
+  const fetchSummary = async (predictionResults: PredictionResult[]) => {
+    if (predictionResults.length === 0) {
+        setSummary('No transactions were processed. Please run a prediction to see a summary.');
+        return;
+    }
+    setIsSummaryLoading(true);
+    try {
+        const response = await getSummary(predictionResults);
+        if (response.error) {
+            toast({
+                variant: 'destructive',
+                title: 'AI Summary Failed',
+                description: response.error,
+            });
+            setSummary('Could not generate a summary.');
+        } else {
+            setSummary(response.summary || 'Summary generated successfully.');
+        }
+    } catch (error) {
+        setSummary('An unexpected error occurred while generating the summary.');
+    } finally {
+        setIsSummaryLoading(false);
+    }
+  };
   
-  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, error?: string }>) => {
+  const processPredictions = async (predictionPromise: Promise<{ results?: PredictionResult[], result?: PredictionResult, featureImportance?: FeatureImportance[], error?: string }>) => {
     setIsLoading(true);
     setResults([]);
     setMessages([]);
+    setSummary('');
+    setFeatureImportance([]);
+
 
     try {
       const response = await predictionPromise;
@@ -58,6 +92,7 @@ export default function DashboardPage() {
       
       const newResults = response.results || (response.result ? [response.result] : []);
       setResults(newResults);
+      setFeatureImportance(response.featureImportance || []);
 
       // Process patterns for the chart
       const newPatterns = newResults.reduce((acc, curr) => {
@@ -85,6 +120,9 @@ export default function DashboardPage() {
         description: `${newResults.length} transaction(s) processed.`,
       });
 
+      // Fetch summary after getting results
+      fetchSummary(newResults);
+
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -93,18 +131,18 @@ export default function DashboardPage() {
       });
       setResults([]);
       setPatterns(initialPatterns);
+      setFeatureImportance([]);
+      setSummary('');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleManualSubmit = (data: Transaction) => {
-    // In a real scenario, you'd get feature importance from the model
     processPredictions(predictFraud(data));
   };
   
   const handleCsvSubmit = (file: File) => {
-    // In a real scenario, you'd get feature importance from the model
     processPredictions(batchPredictFraud(file.name));
   };
 
@@ -176,9 +214,11 @@ export default function DashboardPage() {
       <SidebarInset className="flex flex-col">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 space-y-8">
-          <div className="grid gap-8 md:grid-cols-2">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-2">
             <FraudProbabilityChart data={results} isLoading={isLoading} />
             <TransactionPatternsChart data={patterns} isLoading={isLoading}/>
+            <SummaryCard summary={summary} isLoading={isSummaryLoading || isLoading} />
+            <FeatureImportanceChart data={featureImportance} />
           </div>
           {isLoading ? (
             <Card>
