@@ -28,26 +28,30 @@ export async function predictFraud(data: Transaction): Promise<{ result?: Predic
 
   try {
     // =================================================================
-    // START: ML Model Integration Point
+    // START: DJANGO ML Model Integration Point
     // =================================================================
     
-    // 1. Define your model's API endpoint.
-    // const YOUR_MODEL_ENDPOINT = 'https://your-model-api.com/predict';
+    // 1. Define your Django API endpoint for single predictions.
+    //    This should point to the URL route in your Django app that handles prediction.
+    const YOUR_DJANGO_ENDPOINT = 'http://localhost:8000/api/predict/'; // Or your production URL
 
-    // 2. Make an API call to your model.
-    //    You might need to add headers for authentication (e.g., API keys).
+    // 2. Make an API call to your Django backend.
     /*
-    const response = await fetch(YOUR_MODEL_ENDPOINT, {
+    const response = await fetch(YOUR_DJANGO_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // 'Authorization': `Bearer YOUR_API_KEY` 
+        // If your Django API requires authentication (e.g., using Django REST Framework's TokenAuthentication),
+        // you would include your token in the Authorization header like this:
+        // 'Authorization': `Token YOUR_API_TOKEN` 
       },
       body: JSON.stringify(data)
     });
 
     if (!response.ok) {
-      throw new Error(`Model API call failed with status: ${response.status}`);
+      // NOTE: Remember to configure CORS on your Django backend to allow requests
+      // from your Next.js frontend's domain. A popular package for this is `django-cors-headers`.
+      throw new Error(`Django API call failed with status: ${response.status}`);
     }
 
     const modelPrediction = await response.json();
@@ -55,7 +59,7 @@ export async function predictFraud(data: Transaction): Promise<{ result?: Predic
 
     // 3. Replace mock logic with actual results from your model.
     //    The example below assumes your model returns a `prediction` and `riskScore`.
-    //    Adjust this to match your model's actual response structure.
+    //    Adjust this to match your Django API's actual response structure.
 
     // MOCK LOGIC (DELETE AND REPLACE THIS)
     await new Promise((resolve) => setTimeout(resolve, 1500)); // Simulate network latency
@@ -78,7 +82,7 @@ export async function predictFraud(data: Transaction): Promise<{ result?: Predic
     return { result, featureImportance: MOCK_FEATURE_IMPORTANCE };
 
     // =================================================================
-    // END: ML Model Integration Point
+    // END: DJANGO ML Model Integration Point
     // =================================================================
 
   } catch (e) {
@@ -89,7 +93,7 @@ export async function predictFraud(data: Transaction): Promise<{ result?: Predic
 }
 
 // This function simulates a batch prediction from a CSV.
-// TODO: This should be updated to handle file upload and processing with your model.
+// TODO: This should be updated to handle file upload and processing with your Django model.
 export async function batchPredictFraud(fileName: string): Promise<{ results?: PredictionResult[]; featureImportance?: FeatureImportance[]; error?: string }> {
   await new Promise((resolve) => setTimeout(resolve, 2500)); // Simulate processing time
 
@@ -98,10 +102,11 @@ export async function batchPredictFraud(fileName: string): Promise<{ results?: P
   }
   
   try {
-    // In a real application, you would:
-    // 1. Parse the CSV file content.
-    // 2. Send the batch data to your model's batch prediction endpoint.
-    // 3. Process the response from your model.
+    // In a real application with a Django backend, you would typically:
+    // 1. Get the file object from the CsvUpload component. (This may require changing the function signature).
+    // 2. Create a FormData object to send the file.
+    // 3. Send the file to your Django batch prediction endpoint using a 'multipart/form-data' request.
+    // 4. Process the response from your model.
     // For now, we are just generating mock results.
     
     const results: PredictionResult[] = Array.from({ length: 15 }, (_, i) => {
