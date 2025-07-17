@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: fraudlens-backend
+    env: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: "gunicorn fraud_detection_project.wsgi"
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        value: 'django-insecure-p5+0wa)-3t=q)9-=mm_^e*pe+$3syzg*x2r7e2_a00n^7czc84'
+      - key: ALLOWED_HOSTS
+        value: "*"
